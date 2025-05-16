@@ -1,0 +1,23 @@
+Package: Logica
+Title: Logica: A likelihood framework for cross-ancestry local genetic
+    correlation estimation using summary statistics
+Version: 0.1.0
+Authors@R: 
+    person("Boran", "Gao", , "gao824@purdue.edu", role = c("aut", "cre"),
+           comment = c(ORCID = "https://orcid.org/0000-0002-8620-0534"))
+Description: Logica is a likelihood framework for cross-ancestry local
+    genetic correlation estimation using summary statistics only
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.2
+Imports: 
+    CompQuadForm,
+    dplyr,
+    HDMT,
+    Rcpp,
+    RcppArmadillo,
+    susieR
+LinkingTo: 
+    Rcpp,
+    RcppArmadillo
