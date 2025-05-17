@@ -22,7 +22,7 @@ they are not installed already.
 
 ## Quick Start
 
-See [Tutorial](https://github.com/borangao/Logica_Analysis) for detailed documentation and examples.
+See [Tutorial](https://borangao.github.io/Logica_Analysis) for detailed documentation and examples.
 
 ## Issues
 All feedback, bug reports and suggestions are warmly welcomed! Please contact me at gao824@purdue.edu. Please make sure to raise issues with a detailed and reproducible exmple and also please provide the output of your sessionInfo() in R! 
