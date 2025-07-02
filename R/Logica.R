@@ -89,8 +89,10 @@ preprocess_data <- function(z1, z2, R1, R2) {
 #'
 #' @return A data frame with results.
 #' @export
-run_Logica <- function(sumstat_1, sumstat_2, R1, R2, n1, n2, z1_intercept = 1, z2_intercept = 1, fix_intercept = TRUE) {
+run_Logica <- function(sumstat_1, sumstat_2, R1, R2, n1, n2, z1_intercept = 1, z2_intercept = 1, fix_intercept = TRUE, initial_method = "Uni".screen = FALSE) {
   
+  t0 <- Sys.time()
+
   chr<-unique(sumstat_1$CHROM)
   start<-min(sumstat_1$POS)
   end<-max(sumstat_1$POS)
@@ -117,8 +119,12 @@ run_Logica <- function(sumstat_1, sumstat_2, R1, R2, n1, n2, z1_intercept = 1, z
   z1<-sumstat_1$Z
   z2<-sumstat_2$Z
   num_SNP <- length(z1)
-  
   # Estimate initial heritabilities
+  if(initial_method=="MOM"){
+    h2_1_initial = min(max(mean(z1^2-z1_intercept)/mean(apply(R1,2,function(x)sum(x^2))),10^-40),0.1)
+    h2_2_initial = min(max(mean(z2^2-z2_intercept)/mean(apply(R2,2,function(x)sum(x^2))),10^-40),0.1)
+  }else{
+  
   h2_1_initial <- optim(10^-20, llk_h2_est, method = "Brent", sigma = z1_intercept, z = z1,
                         R = R1, n = n1, num_SNP = num_SNP,
                         lower = 10^-40, upper = 10^-1)$par
@@ -127,6 +133,7 @@ run_Logica <- function(sumstat_1, sumstat_2, R1, R2, n1, n2, z1_intercept = 1, z
                         R = R2, n = n2, num_SNP = num_SNP,
                         lower = 10^-40, upper = 10^-1)$par
   
+  }
   # Estimate null score and heritabilities
   est_score <- est_h2_null_score(
     h2_1_initial, h2_2_initial, z1_intercept, z2_intercept, 
@@ -140,6 +147,24 @@ run_Logica <- function(sumstat_1, sumstat_2, R1, R2, n1, n2, z1_intercept = 1, z
   davies_score_h2_2 <- davies(est_score$h2_2_score, est_score$h2_2_eigvals, acc = 1e-10)$Qq
   davies_score_rho <- 2 * davies(abs(est_score$rho_score), sort(est_score$rho_eigvals), acc = 1e-10)$Qq
   
+  t1 <- Sys.time()
+  step1_mins <- as.numeric(difftime(t1, t0, units = "mins"))
+  cat(sprintf("Step 1 Screening heritable region: %.3f minutes\n", step1_mins))
+
+  if (screen) {
+    return(data.frame(
+      chr        = as.character(chr),
+      start      = start_readable,
+      end        = end_readable,
+      Est_h2_1   = est_score$est[1],
+      Est_h2_2   = est_score$est[2],
+      P_h2_1     = davies_score_h2_1,
+      P_h2_2     = davies_score_h2_2,
+      P_rho_score= davies_score_rho,
+       Time_step1  = step1_mins
+    ))
+  }
+
   # Initial rho estimate
   rho_initial <- if(min(est_score$est[1], est_score$est[2]) < 1e-6) {
     0
@@ -165,6 +190,15 @@ run_Logica <- function(sumstat_1, sumstat_2, R1, R2, n1, n2, z1_intercept = 1, z
   # Likelihood ratio test
   llk_test <- pchisq(2 * (est_rho$llk_alt - est_score$llk_null), df = 1, lower.tail = FALSE)
   
+  t2 <- Sys.time()
+  step2_mins <- as.numeric(difftime(t2, t1, units = "mins"))
+  cat(sprintf("Step 2 Estimation of genetic correlation:    %.3f minutes\n", step2_mins))
+
+  # 3. Total
+  total_mins <- as.numeric(difftime(t2, t0, units = "mins"))
+  cat(sprintf("Total (start → end):              %.3f minutes\n\n", total_mins))
+
+
   # Output results as named vector
   results <- data.frame(
     chr = as.character(chr),
@@ -177,7 +211,10 @@ run_Logica <- function(sumstat_1, sumstat_2, R1, R2, n1, n2, z1_intercept = 1, z
     P_h2_1 = davies_score_h2_1,
     P_h2_2 = davies_score_h2_2,
     P_rho_score = davies_score_rho,
-    P_rho_LLK = llk_test
+    P_rho_LLK = llk_test,
+    Time_step1  = step1_mins,
+    Time_step2  = step2_mins,
+    Time_total  = total_mins
   )
   
   return(results)
