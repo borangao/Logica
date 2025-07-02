@@ -89,7 +89,7 @@ preprocess_data <- function(z1, z2, R1, R2) {
 #'
 #' @return A data frame with results.
 #' @export
-run_Logica <- function(sumstat_1, sumstat_2, R1, R2, n1, n2, z1_intercept = 1, z2_intercept = 1, fix_intercept = TRUE, initial_method = "Uni".screen = FALSE) {
+run_Logica <- function(sumstat_1, sumstat_2, R1, R2, n1, n2, z1_intercept = 1, z2_intercept = 1, fix_intercept = TRUE, initial_method = "Uni",screen = FALSE) {
   
   t0 <- Sys.time()
 
