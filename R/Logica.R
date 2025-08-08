@@ -204,6 +204,9 @@ run_Logica <- function(sumstat_1, sumstat_2, R1, R2, n1, n2, z1_intercept = 1, z
     chr = as.character(chr),
     start = start_readable,
     end = end_readable,
+    Est_h2_1_initial = h2_1_initial,
+    Est_h2_2_initial = h2_2_initial,
+    Est_rho_initial = rho_initial,
     Est_h2_1 = est_rho$est[1],
     Est_h2_2 = est_rho$est[2],
     Est_cov = est_rho$est[3],
@@ -243,3 +246,91 @@ p_HDMT<-function(p1,p2){
   return(p_HDMT)
 }
  
+#' Run Logica Analysis with different initials
+#'
+#' This function runs the Logica pipeline using summary statistics and LD matrices.
+#'
+#' @param sumstat_1 Summary statistics for population 1.
+#' @param sumstat_2 Summary statistics for population 2.
+#' @param R1 LD matrix for population 1.
+#' @param R2 LD matrix for population 2.
+#' @param n1 Sample size for population 1.
+#' @param n2 Sample size for population 2.
+#' @param ... Additional parameters.
+#'
+#' @return A data frame with results.
+#' @export
+ run_Logica_initial <- function(sumstat_1, sumstat_2, R1, R2, n1, n2, z1_intercept = 1, z2_intercept = 1, h2_1_initial,h2_2_initial,rho_initial,fix_intercept = TRUE) {
+  
+  chr<-unique(sumstat_1$CHROM)
+  start<-min(sumstat_1$POS)
+  end<-max(sumstat_1$POS)
+  
+  convert_size <- function(size_bytes) {
+    if (size_bytes >= 1024^2) {
+      size <- round(size_bytes / 1024^2, 2)
+      unit <- "MB"
+    } else if (size_bytes >= 1024) {
+      size <- round(size_bytes / 1024, 2)
+      unit <- "KB"
+    } else {
+      size <- size_bytes
+      unit <- "bytes"
+    }
+    paste0(size, " ", unit)
+  }
+  
+  start_readable <- convert_size(start)
+  end_readable <- convert_size(end)
+  
+  z1<-sumstat_1$Z
+  z2<-sumstat_2$Z
+  num_SNP <- length(z1)
+
+  # Estimate null score and heritabilities
+  est_score <- est_h2_null_score(
+    h2_1_initial, h2_2_initial, z1_intercept, z2_intercept, 
+    z_1 = z1, z_2 = z2,
+    R_1 = R1, R_2 = R2,
+    n_1 = n1, n_2 = n2, num_SNP = num_SNP, max_iter = 1000, fix_intercept = fix_intercept
+  )
+  
+  # Compute Davies p-values for heritability tests
+  davies_score_h2_1 <- davies(est_score$h2_1_score, est_score$h2_1_eigvals, acc = 1e-10)$Qq
+  davies_score_h2_2 <- davies(est_score$h2_2_score, est_score$h2_2_eigvals, acc = 1e-10)$Qq
+  davies_score_rho <- 2 * davies(abs(est_score$rho_score), sort(est_score$rho_eigvals), acc = 1e-10)$Qq
+  
+  # Final estimation via PX-EM
+  est_rho <- PX_EM_alt(
+    est_score$est[1], est_score$est[2], rho_initial,
+    est_score$est[3], est_score$est[4],
+    z_1 = z1, z_2 = z2,
+    R_1 = R1, R_2 = R2,
+    n_1 = n1, n_2 = n2,
+    num_SNP = num_SNP, n_iter = 100,
+    fix_intercept = fix_intercept, fix_h2 = est_score$fix_h2
+  )
+  
+  # Likelihood ratio test
+  llk_test <- pchisq(2 * (est_rho$llk_alt - est_score$llk_null), df = 1, lower.tail = FALSE)
+  
+  # Output results as named vector
+  results <- data.frame(
+    chr = as.character(chr),
+    start = start_readable,
+    end = end_readable,
+    Est_h2_1_initial = h2_1_initial,
+    Est_h2_2_initial = h2_2_initial,
+    Est_rho_initial = rho_initial,
+    Est_h2_1 = est_rho$est[1],
+    Est_h2_2 = est_rho$est[2],
+    Est_cov = est_rho$est[3],
+    Est_rho = est_rho$est[3]/sqrt(est_rho$est[1] * est_rho$est[2]),
+    P_h2_1 = davies_score_h2_1,
+    P_h2_2 = davies_score_h2_2,
+    P_rho_score = davies_score_rho,
+    P_rho_LLK = llk_test
+  )
+  
+  return(results)
+}
