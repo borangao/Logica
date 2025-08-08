@@ -3,6 +3,7 @@
 export(p_HDMT)
 export(preprocess_data)
 export(run_Logica)
+export(run_Logica_initial)
 import(CompQuadForm)
 import(HDMT)
 import(Rcpp)
